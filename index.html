@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secret Lab Vault</title>
+    <style>
+        /* --- RESET & VARIABLES --- */
+        :root {
+            --bg-dark: #0f172a;
+            --glass: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --primary: #d946ef; /* Fuchsia */
+            --secondary: #8b5cf6; /* Violet */
+            --accent: #22d3ee; /* Cyan */
+            --neon-text: #ffffff;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; outline: none; }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #000;
+            color: var(--neon-text);
+            height: 100vh;
+            overflow: hidden; /* Prevent scroll during intro */
+        }
+
+        /* --- INTRO / SECRET DOOR --- */
+        #intro-layer {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: #050505;
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            overflow: hidden;
+        }
+
+        .click-hint {
+            position: absolute;
+            color: #444;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            animation: blink 2s infinite;
+            pointer-events: none;
+        }
+
+        /* Rock Doors */
+        .rock-door {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            width: 55%; /* Slightly overlap */
+            background: #1a1a1a;
+            background-image: 
+                radial-gradient(circle at 50% 50%, #2a2a2a 0%, #000 100%);
+            transition: transform 2.5s cubic-bezier(0.77, 0, 0.175, 1);
+            z-index: 10;
+            box-shadow: inset 0 0 100px #000;
+        }
+
+        .rock-left {
+            left: 0;
+            right: auto;
+            border-right: 5px solid #333;
+            /* Jagged edge using clip-path */
+            clip-path: polygon(0 0, 100% 0, 95% 10%, 100% 20%, 92% 30%, 100% 40%, 96% 50%, 100% 60%, 94% 70%, 100% 80%, 93% 90%, 100% 100%, 0 100%);
+        }
+
+        .rock-right {
+            right: 0;
+            left: auto;
+            border-left: 5px solid #333;
+            clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 7% 90%, 0 80%, 6% 70%, 0 60%, 4% 50%, 0 40%, 8% 30%, 0 20%, 5% 10%);
+        }
+
+        /* Earthquake Animation */
+        @keyframes quake {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            20% { transform: translate(-10px, 10px) rotate(-2deg); }
+            40% { transform: translate(-10px, -10px) rotate(2deg); }
+            60% { transform: translate(10px, 10px) rotate(0deg); }
+            80% { transform: translate(10px, -10px) rotate(2deg); }
+            100% { transform: translate(0, 0) rotate(0deg); }
+        }
+
+        .shake-hard {
+            animation: quake 0.5s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        /* --- DASHBOARD (Initially Hidden) --- */
+        #dashboard-app {
+            opacity: 0;
+            transition: opacity 1s ease 1s; /* Delay fade in until doors open */
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+        }
+
+        header {
+            padding: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(to right, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+            text-shadow: 0 0 20px rgba(217, 70, 239, 0.5);
+        }
+
+        .btn-main {
+            background: linear-gradient(45deg, var(--secondary), var(--primary));
+            border: none;
+            color: white;
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0 15px var(--secondary);
+            transition: all 0.3s;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-main:hover {
+            transform: scale(1.1) rotate(-2deg);
+            box-shadow: 0 0 30px var(--primary);
+        }
+
+        /* --- GRID --- */
+        .grid-container {
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 2rem;
+            padding-bottom: 4rem;
+        }
+
+        .lab-card {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 15px;
+            padding: 1.5rem;
+            position: relative;
+            transition: 0.3s;
+            cursor: pointer;
+            overflow: hidden;
+            backdrop-filter: blur(5px);
+        }
+
+        .lab-card::before {
+            content: '';
+            position: absolute;
+            top: -50px; left: -50px;
+            width: 100px; height: 100px;
+            background: radial-gradient(circle, rgba(255,255,255,0.2), transparent);
+            border-radius: 50%;
+            transition: 0.5s;
+        }
+
+        .lab-card:hover {
+            transform: translateY(-10px);
+            border-color: var(--accent);
+            box-shadow: 0 10px 40px rgba(34, 211, 238, 0.2);
+        }
+
+        .lab-card:hover::before {
+            top: -20px; left: -20px;
+            width: 150px; height: 150px;
+        }
+
+        .card-title {
+            font-size: 1.4rem;
+            margin-bottom: 1rem;
+            color: #fff;
+        }
+
+        .card-preview {
+            font-size: 0.9rem;
+            color: #aaa;
+            font-family: monospace;
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            height: 80px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .btn-delete {
+            position: absolute;
+            top: 10px; right: 10px;
+            background: transparent;
+            border: none;
+            color: #ef4444;
+            font-size: 1.2rem;
+            opacity: 0;
+            transition: 0.3s;
+            cursor: pointer;
+        }
+
+        .lab-card:hover .btn-delete { opacity: 1; }
+
+        /* --- MODALS --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(10px);
+            z-index: 500;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: 0.3s;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal-box {
+            background: #1e293b;
+            width: 90%; max-width: 800px;
+            height: 80vh;
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            transform: scale(0.9);
+            transition: 0.3s;
+        }
+
+        .modal-overlay.active .modal-box {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-body {
+            flex: 1;
+            padding: 0;
+            position: relative;
+        }
+
+        /* For Code Input */
+        textarea#codeInput {
+            width: 100%;
+            height: 100%;
+            background: #0f172a;
+            color: #22d3ee;
+            border: none;
+            padding: 1.5rem;
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            resize: none;
+        }
+
+        /* For Preview Iframe */
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: white;
+        }
+
+        .btn-close {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .btn-save {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        input.modal-input {
+            background: #0f172a;
+            border: 1px solid #334155;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            width: 60%;
+            font-size: 1rem;
+        }
+
+        /* Mobile responsive */
+        @media(max-width: 768px) {
+            .rock-door { width: 100%; }
+            .rock-left { clip-path: none; }
+            .rock-right { clip-path: none; display: none; }
+            /* Mobile: Just slide up the one door */
+            .rock-left.open { transform: translateY(-100%); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- INTRO LAYER (The Rock Door) -->
+    <div id="intro-layer" onclick="handleIntroClick()">
+        <div class="rock-door rock-left" id="door-left"></div>
+        <div class="rock-door rock-right" id="door-right"></div>
+        <div class="click-hint" id="click-hint">Tap Screen 3 Times to Open</div>
+    </div>
+
+    <!-- MAIN DASHBOARD -->
+    <div id="dashboard-app">
+        <header>
+            <h1>⚡ Code Vault</h1>
+            <button class="btn-main" onclick="openAddModal()">+ Paste New Lab</button>
+        </header>
+
+        <div class="grid-container" id="labGrid">
+            <!-- Cards go here -->
+        </div>
+    </div>
+
+    <!-- ADD CODE MODAL -->
+    <div class="modal-overlay" id="addModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <input type="text" id="newLabName" class="modal-input" placeholder="Lab Name (e.g. Table Design)">
+                <div>
+                    <button class="btn-close" style="background:#555" onclick="closeModal('addModal')">Cancel</button>
+                    <button class="btn-save" onclick="saveNewLab()">Save Code</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <textarea id="codeInput" placeholder='<h1>Hello World</h1>&#10;<style>body{background: pink;}</style>&#10;<!-- Paste your full HTML code here -->'></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- PREVIEW MODAL -->
+    <div class="modal-overlay" id="previewModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 id="previewTitle" style="color:white;">Preview</h3>
+                <button class="btn-close" onclick="closeModal('previewModal')">Close</button>
+            </div>
+            <div class="modal-body">
+                <iframe id="previewFrame"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA STORAGE ---
+        // Using localStorage to keep data after refresh
+        let labs = JSON.parse(localStorage.getItem('labVaultData')) || [];
+
+        // --- INTRO LOGIC (Earthquake & Door) ---
+        let clicks = 0;
+        const introLayer = document.getElementById('intro-layer');
+        const doorLeft = document.getElementById('door-left');
+        const doorRight = document.getElementById('door-right');
+        const hint = document.getElementById('click-hint');
+        const dashboard = document.getElementById('dashboard-app');
+
+        function handleIntroClick() {
+            clicks++;
+            
+            // Visual feedback for click
+            hint.innerText = `Tap ${3 - clicks} More Times...`;
+            hint.style.color = '#fff';
+            
+            // Trigger Shake
+            introLayer.classList.remove('shake-hard');
+            void introLayer.offsetWidth; // trigger reflow
+            introLayer.classList.add('shake-hard');
+
+            if (clicks >= 3) {
+                // OPEN THE DOORS
+                introLayer.style.pointerEvents = 'none'; // Disable clicks
+                hint.style.display = 'none';
+                
+                // Massive shake then open
+                setTimeout(() => {
+                    introLayer.classList.remove('shake-hard');
+                    
+                    // Slide doors open
+                    doorLeft.style.transform = 'translateX(-100%)';
+                    doorRight.style.transform = 'translateX(100%)';
+                    
+                    // Fade in dashboard
+                    dashboard.style.opacity = '1';
+                    document.body.style.overflow = 'auto'; // Enable scroll
+                    
+                    // Hide intro layer completely after animation
+                    setTimeout(() => {
+                        introLayer.style.display = 'none';
+                    }, 3000);
+                }, 600);
+            }
+        }
+
+        // --- DASHBOARD FUNCTIONS ---
+
+        function renderLabs() {
+            const grid = document.getElementById('labGrid');
+            grid.innerHTML = '';
+
+            labs.forEach((lab, index) => {
+                const card = document.createElement('div');
+                card.className = 'lab-card';
+                // Staggered fade in
+                card.style.animation = `popIn 0.5s ease backwards ${index * 0.1}s`;
+                
+                card.innerHTML = `
+                    <button class="btn-delete" onclick="deleteLab(${index}, event)">🗑️</button>
+                    <h3 class="card-title">${lab.name}</h3>
+                    <div class="card-preview">${lab.code.replace(/</g, '&lt;')}</div>
+                    <button class="btn-main" style="width:100%; font-size:0.9rem; padding:10px;" onclick="runLab(${index})">
+                        ▶ Run Experiment
+                    </button>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function openAddModal() {
+            document.getElementById('addModal').classList.add('active');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        function saveNewLab() {
+            const name = document.getElementById('newLabName').value;
+            const code = document.getElementById('codeInput').value;
+
+            if (!name || !code) {
+                alert("Please enter a name and paste the HTML code!");
+                return;
+            }
+
+            labs.push({ name, code });
+            localStorage.setItem('labVaultData', JSON.stringify(labs));
+            
+            // Reset inputs
+            document.getElementById('newLabName').value = '';
+            document.getElementById('codeInput').value = '';
+            
+            closeModal('addModal');
+            renderLabs();
+        }
+
+        function deleteLab(index, event) {
+            event.stopPropagation(); // Stop card click
+            if(confirm('Delete this lab experiment?')) {
+                labs.splice(index, 1);
+                localStorage.setItem('labVaultData', JSON.stringify(labs));
+                renderLabs();
+            }
+        }
+
+        function runLab(index) {
+            const lab = labs[index];
+            document.getElementById('previewTitle').innerText = "Running: " + lab.name;
+            const iframe = document.getElementById('previewFrame');
+            
+            // Inject the code directly into the iframe
+            iframe.srcdoc = lab.code;
+            
+            document.getElementById('previewModal').classList.add('active');
+        }
+
+        // --- INITIAL RENDER ---
+        renderLabs();
+
+    </script>
+</body>
+</html>
